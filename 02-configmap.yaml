@@ -1,0 +1,48 @@
+##############################################################################
+# ConfigMap - Store non-sensitive configuration data
+##############################################################################
+
+# ConfigMap for application configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: knote-config
+  namespace: knote-app
+  labels:
+    app: knote
+data:
+  # Key-value pairs accessible as env vars or mounted as files
+  APP_PORT: "8080"
+  APP_ENV: "production"
+  LOG_LEVEL: "info"
+  NODE_ENV: "production"
+  APP_NAME: "knote"
+  MAX_UPLOAD_SIZE: "10mb"
+
+---
+# ConfigMap as a file (mounted as volume)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: knote-nginx-config
+  namespace: knote-app
+  labels:
+    app: knote
+data:
+  nginx.conf: |
+    server {
+      listen 80;
+      server_name localhost;
+
+      location / {
+        proxy_pass http://localhost:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      }
+
+      location /health {
+        return 200 'healthy';
+        add_header Content-Type text/plain;
+      }
+    }

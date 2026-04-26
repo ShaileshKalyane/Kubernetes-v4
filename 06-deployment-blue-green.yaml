@@ -1,0 +1,103 @@
+##############################################################################
+# Deployment - BLUE/GREEN Strategy (using labels to switch traffic)
+#
+# How it works:
+#   1. "Blue" deployment runs current version (v1)
+#   2. "Green" deployment runs new version (v2) alongside Blue
+#   3. Service selector switches from blue -> green to cut over
+#   4. If green is healthy, delete blue. If not, switch back.
+#   - Best for: critical apps needing instant rollback capability
+##############################################################################
+
+# --- BLUE Deployment (current/stable version) ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: knote-blue
+  namespace: knote-app
+  labels:
+    app: knote-bluegreen
+    version: blue
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: knote-bluegreen
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: knote-bluegreen
+        version: blue
+    spec:
+      containers:
+        - name: knote
+          image: andalike/node8080     # v1
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: knote-config
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+          imagePullPolicy: Always
+
+---
+# --- GREEN Deployment (new version to test) ---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: knote-green
+  namespace: knote-app
+  labels:
+    app: knote-bluegreen
+    version: green
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: knote-bluegreen
+      version: green
+  template:
+    metadata:
+      labels:
+        app: knote-bluegreen
+        version: green
+    spec:
+      containers:
+        - name: knote
+          image: andalike/node8080     # v2 (use different image tag for real blue/green)
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: knote-config
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+          imagePullPolicy: Always
+
+---
+# --- Service pointing to BLUE (switch to green by changing selector) ---
+apiVersion: v1
+kind: Service
+metadata:
+  name: knote-bluegreen-svc
+  namespace: knote-app
+spec:
+  selector:
+    app: knote-bluegreen
+    version: blue         # <-- Change to "green" to switch traffic
+  ports:
+    - port: 80
+      targetPort: 8080
+  type: ClusterIP

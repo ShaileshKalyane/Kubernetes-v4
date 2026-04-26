@@ -1,0 +1,101 @@
+##############################################################################
+# Services - All Types for Exposing Applications
+##############################################################################
+
+# ============================================================================
+# 1. ClusterIP (Default) - Internal access only
+#    - Accessible only within the cluster
+#    - Best for: internal microservice communication
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: knote-clusterip
+  namespace: knote-app
+  labels:
+    app: knote
+    service-type: clusterip
+spec:
+  type: ClusterIP
+  selector:
+    app: knote
+    strategy: rolling-update
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80            # Service port (what other pods connect to)
+      targetPort: 8080    # Container port (where app listens)
+
+---
+# ============================================================================
+# 2. NodePort - Expose on each Node's IP at a static port
+#    - Accessible from outside cluster via <NodeIP>:<NodePort>
+#    - Port range: 30000-32767
+#    - Best for: development, testing, or when you control the nodes
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: knote-nodeport
+  namespace: knote-app
+  labels:
+    app: knote
+    service-type: nodeport
+spec:
+  type: NodePort
+  selector:
+    app: knote
+    strategy: rolling-update
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80            # Service port
+      targetPort: 8080    # Container port
+      nodePort: 30080     # External port on every node (30000-32767)
+
+---
+# ============================================================================
+# 3. LoadBalancer - Provisions an AWS ELB/NLB
+#    - Accessible from the internet via the LB's DNS name
+#    - Creates an AWS Elastic Load Balancer automatically
+#    - Best for: production external traffic
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: knote-loadbalancer
+  namespace: knote-app
+  labels:
+    app: knote
+    service-type: loadbalancer
+  annotations:
+    # AWS-specific annotations for NLB
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+spec:
+  type: LoadBalancer
+  selector:
+    app: knote
+    strategy: rolling-update
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80            # External LB port
+      targetPort: 8080    # Container port
+
+---
+# ============================================================================
+# 4. ExternalName - Maps to an external DNS name
+#    - No proxying, just CNAME DNS record
+#    - Best for: referencing external services (RDS, external APIs)
+# ============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: external-database
+  namespace: knote-app
+  labels:
+    service-type: externalname
+spec:
+  type: ExternalName
+  externalName: my-database.example.ap-south-1.rds.amazonaws.com

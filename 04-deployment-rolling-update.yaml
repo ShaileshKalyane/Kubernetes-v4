@@ -1,0 +1,78 @@
+##############################################################################
+# Deployment - ROLLING UPDATE Strategy (Default, Zero-Downtime)
+#
+# How it works:
+#   - Gradually replaces old pods with new ones
+#   - maxSurge: how many extra pods can exist during update
+#   - maxUnavailable: how many pods can be down during update
+#   - Best for: stateless apps where you need zero downtime
+##############################################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: knote-rolling
+  namespace: knote-app
+  labels:
+    app: knote
+    strategy: rolling-update
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: knote
+      strategy: rolling-update
+  # --- ROLLING UPDATE STRATEGY ---
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1          # 1 extra pod during update (can be % like "25%")
+      maxUnavailable: 0    # 0 pods unavailable = always maintain full capacity
+  template:
+    metadata:
+      labels:
+        app: knote
+        strategy: rolling-update
+    spec:
+      containers:
+        - name: knote
+          image: andalike/node8080
+          ports:
+            - containerPort: 8080
+          # --- Use ConfigMap as environment variables ---
+          envFrom:
+            - configMapRef:
+                name: knote-config
+          # --- Use Secret as environment variables ---
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: knote-secret
+                  key: DB_PASSWORD
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: knote-secret
+                  key: API_KEY
+          # --- Resource Limits ---
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+          # --- Health Checks ---
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          imagePullPolicy: Always

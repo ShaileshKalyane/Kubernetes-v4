@@ -1,0 +1,145 @@
+##############################################################################
+# Network Policies - Control pod-to-pod traffic (requires CNI like Calico)
+##############################################################################
+
+# ============================================================================
+# 1. Default Deny All Ingress - Block all incoming traffic by default
+#    (Zero-trust: deny everything, then allow selectively)
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: knote-app
+spec:
+  podSelector: {}    # Applies to ALL pods in namespace
+  policyTypes:
+    - Ingress
+  # No ingress rules = deny all incoming traffic
+
+---
+# ============================================================================
+# 2. Default Deny All Egress - Block all outgoing traffic by default
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+  namespace: knote-app
+spec:
+  podSelector: {}
+  policyTypes:
+    - Egress
+  # No egress rules = deny all outgoing traffic
+
+---
+# ============================================================================
+# 3. Allow Ingress from specific pods (app -> db)
+#    Only pods with label app=knote can talk to app=knote-db
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-knote-to-db
+  namespace: knote-app
+spec:
+  podSelector:
+    matchLabels:
+      app: knote-db          # Apply to database pods
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: knote     # Only allow traffic from knote app pods
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# ============================================================================
+# 4. Allow Egress to DNS + Database
+#    App pods can reach DNS (kube-dns) and the database
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-knote-egress
+  namespace: knote-app
+spec:
+  podSelector:
+    matchLabels:
+      app: knote
+  policyTypes:
+    - Egress
+  egress:
+    # Allow DNS resolution (required for service discovery)
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow traffic to database pods
+    - to:
+        - podSelector:
+            matchLabels:
+              app: knote-db
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# ============================================================================
+# 5. Allow Ingress from specific namespace
+#    Only pods from the "monitoring" namespace can access knote
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-monitoring-ingress
+  namespace: knote-app
+spec:
+  podSelector:
+    matchLabels:
+      app: knote
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 8080
+
+---
+# ============================================================================
+# 6. Allow Ingress from CIDR block (external IP range)
+# ============================================================================
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-external-cidr
+  namespace: knote-app
+spec:
+  podSelector:
+    matchLabels:
+      app: knote
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 10.0.0.0/16
+            except:
+              - 10.0.1.0/24    # Block this specific subnet
+      ports:
+        - protocol: TCP
+          port: 8080

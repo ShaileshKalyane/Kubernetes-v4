@@ -1,0 +1,10 @@
+##############################################################################
+# Namespace - Isolates all our resources
+##############################################################################
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: knote-app
+  labels:
+    app: knote
+    environment: production

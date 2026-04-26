@@ -1,0 +1,90 @@
+##############################################################################
+# StatefulSet - For STATEFUL applications
+#
+# Differences from Deployment:
+#   - Pods get stable, unique names (knote-db-0, knote-db-1, knote-db-2)
+#   - Pods are created/deleted in order (0 -> 1 -> 2)
+#   - Each pod gets its own PersistentVolumeClaim (stable storage)
+#   - Pods keep their identity across restarts
+#   - Best for: databases, message queues, any app needing stable identity
+##############################################################################
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: knote-db
+  namespace: knote-app
+  labels:
+    app: knote-db
+    type: stateful
+spec:
+  serviceName: knote-db-headless    # Required: headless service for DNS
+  replicas: 3
+  selector:
+    matchLabels:
+      app: knote-db
+  # --- Update Strategy for StatefulSet ---
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      partition: 0    # Update all pods (set to N to only update pods >= N)
+  template:
+    metadata:
+      labels:
+        app: knote-db
+    spec:
+      containers:
+        - name: knote-db
+          image: andalike/node8080
+          ports:
+            - containerPort: 8080
+              name: web
+          envFrom:
+            - configMapRef:
+                name: knote-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: knote-secret
+                  key: DB_PASSWORD
+          # --- Mount Persistent Volume ---
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          imagePullPolicy: Always
+  # --- Volume Claim Template (each pod gets its own PV) ---
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: gp2    # AWS EBS storage class
+        resources:
+          requests:
+            storage: 5Gi
+
+---
+# --- Headless Service (required for StatefulSet DNS) ---
+# Gives each pod a DNS name: knote-db-0.knote-db-headless.knote-app.svc.cluster.local
+apiVersion: v1
+kind: Service
+metadata:
+  name: knote-db-headless
+  namespace: knote-app
+  labels:
+    app: knote-db
+spec:
+  clusterIP: None    # Headless = no load balancing, direct pod DNS
+  selector:
+    app: knote-db
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: web

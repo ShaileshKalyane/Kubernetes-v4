@@ -1,0 +1,49 @@
+##############################################################################
+# Deployment - RECREATE Strategy (Kill all, then create new)
+#
+# How it works:
+#   - Terminates ALL existing pods before creating new ones
+#   - Causes downtime during the update
+#   - Best for: apps that can't run multiple versions simultaneously
+#     (e.g., database migrations, schema changes)
+##############################################################################
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: knote-recreate
+  namespace: knote-app
+  labels:
+    app: knote
+    strategy: recreate
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: knote
+      strategy: recreate
+  # --- RECREATE STRATEGY ---
+  strategy:
+    type: Recreate
+    # No additional config needed - kills all, then creates all
+  template:
+    metadata:
+      labels:
+        app: knote
+        strategy: recreate
+    spec:
+      containers:
+        - name: knote
+          image: andalike/node8080
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: knote-config
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
+          imagePullPolicy: Always
