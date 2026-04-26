@@ -1,31 +1,51 @@
+##############################################################################
+# Variables
+##############################################################################
+
+variable "aws_region" {
+  description = "AWS region to deploy EKS cluster"
+  type        = string
+  default     = "us-east-1"
+}
+
 variable "cluster_name" {
-  type = string
+  description = "Name of the EKS cluster"
+  type        = string
+  default     = "knote-eks-cluster"
 }
 
 variable "cluster_version" {
-  type = string
+  description = "Kubernetes version for EKS"
+  type        = string
+  default     = "1.31"
 }
 
-variable "vpc_id" {
-  type = string
-}
-
-variable "subnet_ids" {
-  type = list(string)
+variable "vpc_cidr" {
+  description = "CIDR block for VPC"
+  type        = string
+  default     = "10.0.0.0/16"
 }
 
 variable "node_instance_type" {
-  type = string
+  description = "EC2 instance type for EKS worker nodes"
+  type        = string
+  default     = "t3.medium"
 }
 
 variable "node_desired_count" {
-  type = number
+  description = "Desired number of worker nodes"
+  type        = number
+  default     = 2
 }
 
 variable "node_min_count" {
-  type = number
+  description = "Minimum number of worker nodes"
+  type        = number
+  default     = 1
 }
 
 variable "node_max_count" {
-  type = number
+  description = "Maximum number of worker nodes"
+  type        = number
+  default     = 4
 }
